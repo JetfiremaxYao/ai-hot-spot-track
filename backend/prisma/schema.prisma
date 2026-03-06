@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 关键词模型
+model Keyword {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  description   String?
+  status        String   @default("active") // 'active' | 'paused'
+  
+  // 关系：多对多通过联结表
+  hotspots      Hotspot[] @relation("KeywordToHotspot")
+  
+  // 元数据
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastCheckedAt DateTime?
+  
+  // 索引
+  @@index([status])
+  @@index([createdAt])
+}
+
+// 热点模型
+model Hotspot {
+  id               Int      @id @default(autoincrement())
+  title            String
+  summary          String
+  content          String
+  source           String   // 'twitter' | 'github' | 'hackernews' | 'reddit' | 'news' | 'rss'
+  sourceUrl        String   @unique
+  
+  // AI评分
+  relevanceScore   Float    @default(0) // 0-10
+  hotnessScore     Float    @default(0) // 0-10
+  credibilityScore Float    @default(0) // 0-10
+  
+  // 元数据
+  imageUrl         String?
+  author           String?
+  publishedAt      DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // 用户交互
+  isRead           Boolean  @default(false)
+  isSaved          Boolean  @default(false)
+  viewCount        Int      @default(0)
+  likeCount        Int      @default(0)
+  
+  // 关系：多对多通过隐式联结表
+  keywords         Keyword[] @relation("KeywordToHotspot")
+  
+  // 索引
+  @@index([source])
+  @@index([hotnessScore])
+  @@index([createdAt])
+  @@index([isRead])
+}

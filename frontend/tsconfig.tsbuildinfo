@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/hotspotcard.tsx","./src/components/keywordlist.tsx","./src/components/layout.tsx","./src/hooks/usehotspots.ts","./src/hooks/usekeywords.ts","./src/pages/hotspotspage.tsx","./src/pages/keywordspage.tsx","./src/services/api.ts","./src/services/socket.ts","./src/types/index.ts"],"version":"5.9.3"}
