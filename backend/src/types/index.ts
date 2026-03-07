@@ -60,6 +60,7 @@ export interface SourcePolicy {
     allowQuotes: boolean
   }
   qualityFilters: {
+    recencyHours: number
     minTitleLength: number
     minContentLength: number
     maxPerDomain: number

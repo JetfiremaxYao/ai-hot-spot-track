@@ -57,12 +57,26 @@ router.post('/', async (req: Request, res: Response) => {
         name: name.trim(),
         description: description?.trim() || null,
         status: 'active'
+      },
+      include: {
+        _count: {
+          select: { hotspots: true }
+        }
       }
     })
 
     res.status(201).json({
       success: true,
-      data: keyword,
+      data: {
+        id: keyword.id,
+        name: keyword.name,
+        description: keyword.description,
+        status: keyword.status,
+        hotspotCount: keyword._count.hotspots,
+        createdAt: keyword.createdAt,
+        updatedAt: keyword.updatedAt,
+        lastCheckedAt: keyword.lastCheckedAt
+      },
       message: '关键词添加成功'
     })
   } catch (error: any) {
@@ -97,12 +111,26 @@ router.patch('/:id/status', async (req: Request, res: Response) => {
 
     const keyword = await prisma.keyword.update({
       where: { id: parseInt(id) },
-      data: { status }
+      data: { status },
+      include: {
+        _count: {
+          select: { hotspots: true }
+        }
+      }
     })
 
     res.json({
       success: true,
-      data: keyword,
+      data: {
+        id: keyword.id,
+        name: keyword.name,
+        description: keyword.description,
+        status: keyword.status,
+        hotspotCount: keyword._count.hotspots,
+        createdAt: keyword.createdAt,
+        updatedAt: keyword.updatedAt,
+        lastCheckedAt: keyword.lastCheckedAt
+      },
       message: `关键词已${status === 'active' ? '激活' : '暂停'}`
     })
   } catch (error: any) {

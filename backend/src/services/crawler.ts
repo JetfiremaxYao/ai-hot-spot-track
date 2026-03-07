@@ -84,6 +84,22 @@ class CrawlerService {
     return true
   }
 
+  private passesRecencyWindow(article: Article, policy: SourcePolicy): boolean {
+    if (!article.publishedAt) return true
+
+    const publishedTime = article.publishedAt instanceof Date
+      ? article.publishedAt.getTime()
+      : new Date(article.publishedAt).getTime()
+
+    if (!Number.isFinite(publishedTime)) {
+      return false
+    }
+
+    const windowMs = policy.qualityFilters.recencyHours * 60 * 60 * 1000
+    const cutoff = Date.now() - windowMs
+    return publishedTime >= cutoff
+  }
+
   private sourceToKey(source: string): SourceKey | null {
     const mapping: Record<string, SourceKey> = {
       google: 'google',
@@ -480,7 +496,9 @@ class CrawlerService {
     })
 
     const qualityFiltered = deduped.filter((article) =>
-      this.passesDomainRules(article, policy) && this.passesQualityFilters(article, policy)
+      this.passesDomainRules(article, policy) &&
+      this.passesQualityFilters(article, policy) &&
+      this.passesRecencyWindow(article, policy)
     )
 
     const prioritized = qualityFiltered.sort((a, b) => {

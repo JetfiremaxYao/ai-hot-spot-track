@@ -18,6 +18,7 @@ export default function KeywordList({
   const [isAdding, setIsAdding] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [pendingStatusId, setPendingStatusId] = useState<number | null>(null)
 
   const handleAdd = async () => {
     if (!newName.trim()) return
@@ -28,6 +29,21 @@ export default function KeywordList({
       setIsAdding(false)
     } catch (err) {
       console.error('添加失败:', err)
+    }
+  }
+
+  const handleToggleStatus = async (kw: any) => {
+    if (pendingStatusId === kw.id) return
+
+    const newStatus: 'active' | 'paused' = kw.status === 'active' ? 'paused' : 'active'
+
+    try {
+      setPendingStatusId(kw.id)
+      await onStatusChange?.(kw.id, newStatus)
+    } catch (err) {
+      console.error('切换关键词状态失败:', err)
+    } finally {
+      setPendingStatusId(null)
     }
   }
 
@@ -99,19 +115,29 @@ export default function KeywordList({
             </div>
 
             <div className="flex items-center space-x-2">
-              <button
-                onClick={() => {
-                  const newStatus = kw.status === 'active' ? 'paused' : 'active'
-                  onStatusChange?.(kw.id, newStatus)
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  kw.status === 'active'
-                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
-                    : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                {kw.status === 'active' ? '监控中' : '已暂停'}
-              </button>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-medium ${kw.status === 'active' ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  {kw.status === 'active' ? '监控中' : '已暂停'}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={kw.status === 'active'}
+                  aria-label={`${kw.name} 抓取开关`}
+                  onClick={() => handleToggleStatus(kw)}
+                  disabled={loading || pendingStatusId === kw.id}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-accent-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    kw.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'
+                  }`}
+                  title={kw.status === 'active' ? '点击暂停抓取' : '点击开启抓取'}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      kw.status === 'active' ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
 
               <button
                 onClick={() => {

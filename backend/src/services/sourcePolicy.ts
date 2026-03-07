@@ -33,6 +33,7 @@ const DEFAULT_POLICY: SourcePolicy = {
     allowQuotes: true
   },
   qualityFilters: {
+    recencyHours: 24,
     minTitleLength: 16,
     minContentLength: 40,
     maxPerDomain: 3,
@@ -150,6 +151,7 @@ function sanitizePolicy(input: DeepPartial<SourcePolicy>): SourcePolicy {
       allowQuotes: toBoolean(merged.twitterThresholds.allowQuotes, DEFAULT_POLICY.twitterThresholds.allowQuotes)
     },
     qualityFilters: {
+      recencyHours: clampInteger(merged.qualityFilters.recencyHours, DEFAULT_POLICY.qualityFilters.recencyHours, 1, 168),
       minTitleLength: clampInteger(merged.qualityFilters.minTitleLength, DEFAULT_POLICY.qualityFilters.minTitleLength, 4, 120),
       minContentLength: clampInteger(merged.qualityFilters.minContentLength, DEFAULT_POLICY.qualityFilters.minContentLength, 0, 3000),
       maxPerDomain: clampInteger(merged.qualityFilters.maxPerDomain, DEFAULT_POLICY.qualityFilters.maxPerDomain, 1, 50),

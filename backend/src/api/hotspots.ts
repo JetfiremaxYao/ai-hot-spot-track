@@ -27,10 +27,18 @@ router.get('/', async (req: Request, res: Response) => {
     if (keyword && typeof keyword === 'string') {
       where.keywords = {
         some: {
+          status: 'active',
           name: {
             contains: keyword,
             mode: 'insensitive'
           }
+        }
+      }
+    } else {
+      // 默认只展示仍关联活跃关键词的热点
+      where.keywords = {
+        some: {
+          status: 'active'
         }
       }
     }

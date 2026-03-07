@@ -94,6 +94,11 @@ router.get('/', async (req: Request, res: Response) => {
     // 默认从数据库搜索
     const hotspots = await prisma.hotspot.findMany({
       where: {
+        keywords: {
+          some: {
+            status: 'active'
+          }
+        },
         OR: [
           { title: { contains: query } },
           { summary: { contains: query } },

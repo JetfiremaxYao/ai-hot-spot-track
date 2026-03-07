@@ -142,6 +142,28 @@ export default function SettingsPage() {
             平衡（覆盖更广）
           </label>
         </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+          <label className="text-sm text-slate-700">
+            <span className="mb-1 block font-medium">内容时效窗口</span>
+            <span className="mb-2 block text-xs text-slate-500">仅采集窗口内的内容，默认 24 小时</span>
+            <select
+              value={policy.qualityFilters.recencyHours}
+              onChange={(e) => updatePolicy('qualityFilters', {
+                ...policy.qualityFilters,
+                recencyHours: Number(e.target.value)
+              })}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+            >
+              <option value={6}>最近 6 小时</option>
+              <option value={12}>最近 12 小时</option>
+              <option value={24}>最近 24 小时（默认）</option>
+              <option value={48}>最近 48 小时</option>
+              <option value={72}>最近 72 小时</option>
+              <option value={168}>最近 7 天</option>
+            </select>
+          </label>
+        </div>
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft space-y-4">

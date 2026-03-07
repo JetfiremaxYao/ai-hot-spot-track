@@ -28,8 +28,9 @@ export function useKeywords() {
     try {
       const newKeyword = await keywordService.create(name, description)
       if (newKeyword) {
-        setKeywords([newKeyword, ...keywords])
+        setKeywords(prev => [newKeyword, ...prev])
       }
+      await fetchKeywords()
       return newKeyword
     } catch (err) {
       setError(err instanceof Error ? err.message : '添加关键词失败')
@@ -41,8 +42,9 @@ export function useKeywords() {
     try {
       const updated = await keywordService.updateStatus(id, status)
       if (updated) {
-        setKeywords(keywords.map(kw => (kw.id === id ? updated : kw)))
+        setKeywords(prev => prev.map(kw => (kw.id === id ? { ...kw, ...updated } : kw)))
       }
+      await fetchKeywords()
       return updated
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新状态失败')
@@ -53,7 +55,8 @@ export function useKeywords() {
   const deleteKeyword = async (id: number) => {
     try {
       await keywordService.delete(id)
-      setKeywords(keywords.filter((kw): kw is Keyword => kw.id !== id))
+      setKeywords(prev => prev.filter((kw): kw is Keyword => kw.id !== id))
+      await fetchKeywords()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败')
       throw err

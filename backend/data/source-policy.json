@@ -27,6 +27,7 @@
     "allowQuotes": true
   },
   "qualityFilters": {
+    "recencyHours": 24,
     "minTitleLength": 16,
     "minContentLength": 40,
     "maxPerDomain": 3,
