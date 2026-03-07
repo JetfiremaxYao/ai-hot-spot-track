@@ -1,4 +1,4 @@
-import { Keyword, Hotspot, ApiResponse, HotspotsResponse } from '../types/index.js'
+import { Keyword, Hotspot, ApiResponse, HotspotsResponse, SourcePolicy } from '../types/index.js'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:5001'
 
@@ -116,6 +116,38 @@ export const searchService = {
     const res = await fetch(`${API_BASE_URL}/api/search?${params}`)
     if (!res.ok) throw new Error('Failed to search')
     const data: ApiResponse<any> = await res.json()
+    return data.data
+  }
+}
+
+export const configService = {
+  getSourcePolicy: async () => {
+    const res = await fetch(`${API_BASE_URL}/api/config/source-policy`)
+    if (!res.ok) throw new Error('Failed to fetch source policy')
+    const data: ApiResponse<SourcePolicy> = await res.json()
+    if (!data.data) throw new Error('Source policy is empty')
+    return data.data
+  },
+
+  updateSourcePolicy: async (policy: SourcePolicy) => {
+    const res = await fetch(`${API_BASE_URL}/api/config/source-policy`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(policy)
+    })
+    if (!res.ok) throw new Error('Failed to update source policy')
+    const data: ApiResponse<SourcePolicy> = await res.json()
+    if (!data.data) throw new Error('Invalid source policy response')
+    return data.data
+  },
+
+  resetSourcePolicy: async () => {
+    const res = await fetch(`${API_BASE_URL}/api/config/source-policy/reset`, {
+      method: 'POST'
+    })
+    if (!res.ok) throw new Error('Failed to reset source policy')
+    const data: ApiResponse<SourcePolicy> = await res.json()
+    if (!data.data) throw new Error('Invalid source policy response')
     return data.data
   }
 }

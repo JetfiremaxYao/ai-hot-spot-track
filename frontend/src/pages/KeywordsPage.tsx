@@ -1,6 +1,5 @@
 import { useKeywords } from '../hooks/useKeywords.js'
 import KeywordList from '../components/KeywordList.jsx'
-import AIProviderSettings from '../components/AIProviderSettings.jsx'
 
 export default function KeywordsPage() {
   const { keywords, loading, error, addKeyword, updateKeywordStatus, deleteKeyword } = useKeywords()

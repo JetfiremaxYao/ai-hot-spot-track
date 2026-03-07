@@ -1,13 +1,166 @@
 import axios from 'axios'
 import { load } from 'cheerio'
-import { Article } from '../types/index.js'
+import sourcePolicyService from './sourcePolicy.js'
+import { Article, SourcePolicy } from '../types/index.js'
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
+type SourceKey = keyof SourcePolicy['sources']
+
 class CrawlerService {
+  private normalizeUrl(url: string, removeTrackingParams: boolean): string {
+    try {
+      const parsed = new URL(url)
+      parsed.hash = ''
 
-  // ─── Bing 搜索（无需 API） ───────────────────────────────
+      if (removeTrackingParams) {
+        const trackingPrefixes = ['utm_', 'spm', 'fbclid', 'gclid', 'mc_']
+        for (const key of Array.from(parsed.searchParams.keys())) {
+          const lower = key.toLowerCase()
+          if (trackingPrefixes.some((prefix) => lower.startsWith(prefix))) {
+            parsed.searchParams.delete(key)
+          }
+        }
+      }
 
+      if (
+        (parsed.protocol === 'http:' && parsed.port === '80') ||
+        (parsed.protocol === 'https:' && parsed.port === '443')
+      ) {
+        parsed.port = ''
+      }
+
+      return parsed.toString().replace(/\/$/, '')
+    } catch {
+      return url
+    }
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      return new URL(url).hostname.toLowerCase()
+    } catch {
+      return ''
+    }
+  }
+
+  private normalizeArticle(article: Article, policy: SourcePolicy): Article {
+    const normalizedUrl = this.normalizeUrl(article.url, policy.qualityFilters.removeTrackingParams)
+    return {
+      ...article,
+      url: normalizedUrl,
+      domain: this.extractDomain(normalizedUrl)
+    }
+  }
+
+  private passesDomainRules(article: Article, policy: SourcePolicy): boolean {
+    if (!article.domain) return false
+    const denylist = policy.domainRules.denylist || []
+
+    if (denylist.some((rule) => article.domain?.includes(rule))) {
+      return false
+    }
+
+    return true
+  }
+
+  private passesQualityFilters(article: Article, policy: SourcePolicy): boolean {
+    const title = (article.title || '').trim()
+    const content = (article.content || '').trim()
+
+    if (title.length < policy.qualityFilters.minTitleLength) {
+      return false
+    }
+
+    if (content.length > 0 && content.length < policy.qualityFilters.minContentLength) {
+      return false
+    }
+
+    // 极端短句或乱码会被剔除
+    if (!/\w{3,}/.test(title)) {
+      return false
+    }
+
+    return true
+  }
+
+  private sourceToKey(source: string): SourceKey | null {
+    const mapping: Record<string, SourceKey> = {
+      google: 'google',
+      bing: 'bing',
+      duckduckgo: 'duckduckgo',
+      hackernews: 'hackernews',
+      twitter: 'twitter'
+    }
+
+    return mapping[source] || null
+  }
+
+  private applySourceQuota(articles: Article[], policy: SourcePolicy): Article[] {
+    const sourceCounts: Record<string, number> = {}
+    const domainCounts: Record<string, number> = {}
+    const result: Article[] = []
+
+    for (const article of articles) {
+      const sourceKey = this.sourceToKey(article.source)
+      const sourceQuota = sourceKey ? policy.sourceQuota[sourceKey] : 10
+      const sourceCount = sourceCounts[article.source] || 0
+
+      if (sourceCount >= sourceQuota) {
+        continue
+      }
+
+      const domain = article.domain || 'unknown'
+      const domainCount = domainCounts[domain] || 0
+      if (domainCount >= policy.qualityFilters.maxPerDomain) {
+        continue
+      }
+
+      sourceCounts[article.source] = sourceCount + 1
+      domainCounts[domain] = domainCount + 1
+      result.push(article)
+    }
+
+    return result
+  }
+
+  private parseTwitterCount(value: any): number {
+    const n = Number(value)
+    return Number.isFinite(n) && n > 0 ? n : 0
+  }
+
+  private passesTwitterThresholds(article: Article, policy: SourcePolicy): boolean {
+    const thresholds = policy.twitterThresholds
+    const signals = article.qualitySignals || {}
+
+    if (!thresholds.allowReplies && signals.isReply) {
+      return false
+    }
+
+    if (!thresholds.allowQuotes && signals.isQuote) {
+      return false
+    }
+
+    if ((signals.likes || 0) < thresholds.minLikes) {
+      return false
+    }
+
+    if ((signals.reposts || 0) < thresholds.minReposts) {
+      return false
+    }
+
+    if ((signals.replies || 0) < thresholds.minReplies) {
+      return false
+    }
+
+    if ((signals.followers || 0) < thresholds.minFollowers) {
+      return false
+    }
+
+    return true
+  }
+
+  // Bing 搜索（无需 API）
   async crawlBing(keywords: string[] = []): Promise<Article[]> {
     const query = keywords.length > 0
       ? keywords.join(' OR ') + ' AI'
@@ -23,7 +176,6 @@ class CrawlerService {
       const $ = load(response.data)
       const articles: Article[] = []
 
-      // Bing News card 结构
       $('div.news-card, a.news-card').slice(0, 25).each((_, el) => {
         try {
           const titleEl = $(el).find('a.title, div.title')
@@ -41,10 +193,11 @@ class CrawlerService {
               content: snippet ? `${source} - ${snippet}` : title
             })
           }
-        } catch (e) { /* skip */ }
+        } catch {
+          // skip item
+        }
       })
 
-      // 备用选择器 — Bing 普通搜索结果
       if (articles.length === 0) {
         const resp2 = await axios.get('https://www.bing.com/search', {
           params: { q: query },
@@ -62,7 +215,9 @@ class CrawlerService {
             if (title && url && url.startsWith('http')) {
               articles.push({ title, url, source: 'bing', publishedAt: new Date(), content: snippet })
             }
-          } catch (e) { /* skip */ }
+          } catch {
+            // skip item
+          }
         })
       }
 
@@ -74,15 +229,13 @@ class CrawlerService {
     }
   }
 
-  // ─── Google 搜索（无需 API） ──────────────────────────────
-
+  // Google 搜索（无需 API）
   async crawlGoogle(keywords: string[] = []): Promise<Article[]> {
     const query = keywords.length > 0
       ? keywords.join(' OR ') + ' AI news'
       : 'AI artificial intelligence latest news'
 
     try {
-      // 使用 Google 轻量 HTML 页面（不易被 block）
       const response = await axios.get('https://www.google.com/search', {
         params: { q: query, num: 20, hl: 'en', tbm: 'nws' },
         timeout: 30000,
@@ -96,7 +249,6 @@ class CrawlerService {
       const $ = load(response.data)
       const articles: Article[] = []
 
-      // Google News 搜索结果
       $('div.SoaBEf, div.xuvV6b, div.dbsr').slice(0, 20).each((_, el) => {
         try {
           const a = $(el).find('a').first()
@@ -108,10 +260,11 @@ class CrawlerService {
           if (title && url && url.startsWith('http')) {
             articles.push({ title, url, source: 'google', publishedAt: new Date(), content: snippet })
           }
-        } catch (e) { /* skip */ }
+        } catch {
+          // skip item
+        }
       })
 
-      // 备用: 普通搜索结果
       if (articles.length === 0) {
         $('div.g, div.tF2Cxc').slice(0, 20).each((_, el) => {
           try {
@@ -123,7 +276,9 @@ class CrawlerService {
             if (title && url && url.startsWith('http')) {
               articles.push({ title, url, source: 'google', publishedAt: new Date(), content: snippet })
             }
-          } catch (e) { /* skip */ }
+          } catch {
+            // skip item
+          }
         })
       }
 
@@ -135,15 +290,13 @@ class CrawlerService {
     }
   }
 
-  // ─── DuckDuckGo 搜索（无需 API） ─────────────────────────
-
+  // DuckDuckGo 搜索（无需 API）
   async crawlDuckDuckGo(keywords: string[] = []): Promise<Article[]> {
     const query = keywords.length > 0
       ? keywords.join(' ') + ' AI'
       : 'AI artificial intelligence news'
 
     try {
-      // DuckDuckGo HTML 版本，对爬虫非常友好
       const response = await axios.get('https://html.duckduckgo.com/html/', {
         params: { q: query },
         timeout: 30000,
@@ -164,7 +317,6 @@ class CrawlerService {
           let url = a.attr('href') || ''
           const snippet = $(el).find('.result__snippet, a.result__snippet').text()?.trim() || ''
 
-          // DuckDuckGo 有时会用重定向 URL
           if (url.includes('uddg=')) {
             const match = url.match(/uddg=([^&]+)/)
             if (match) url = decodeURIComponent(match[1])
@@ -173,7 +325,9 @@ class CrawlerService {
           if (title && url && url.startsWith('http')) {
             articles.push({ title, url, source: 'duckduckgo', publishedAt: new Date(), content: snippet })
           }
-        } catch (e) { /* skip */ }
+        } catch {
+          // skip item
+        }
       })
 
       console.log(`✓ 爬取 DuckDuckGo: ${articles.length} 条结果`)
@@ -184,8 +338,7 @@ class CrawlerService {
     }
   }
 
-  // ─── HackerNews（保留） ───────────────────────────────────
-
+  // HackerNews
   async crawlHackerNews(): Promise<Article[]> {
     try {
       const response = await axios.get('https://news.ycombinator.com', {
@@ -204,7 +357,7 @@ class CrawlerService {
 
           const nextRow = $(el).next()
           const scoreText = nextRow.find('.score').text()
-          const points = parseInt(scoreText) || 0
+          const points = parseInt(scoreText, 10) || 0
 
           if (title && url) {
             articles.push({
@@ -215,7 +368,9 @@ class CrawlerService {
               content: `Points: ${points}`
             })
           }
-        } catch (e) { /* skip */ }
+        } catch {
+          // skip item
+        }
       })
 
       console.log(`✓ 爬取 HackerNews: ${articles.length} 篇文章`)
@@ -226,12 +381,17 @@ class CrawlerService {
     }
   }
 
-  // ─── Twitter/X（默认关闭，通过 ENABLE_TWITTER=true 开启） ──
+  // Twitter/X（默认关闭，通过配置页开启）
+  async crawlTwitter(keywords: string[] = [], policy?: SourcePolicy): Promise<Article[]> {
+    const currentPolicy = policy || await sourcePolicyService.getPolicy()
 
-  async crawlTwitter(keywords: string[] = []): Promise<Article[]> {
-    // 默认关闭，需要通过环境变量 ENABLE_TWITTER=true 开启
-    const enableTwitter = process.env.ENABLE_TWITTER === 'true'
-    if (!enableTwitter) {
+    if (!currentPolicy.sources.twitter) {
+      console.log('⏭️  跳过 Twitter/X (配置中已关闭)')
+      return []
+    }
+
+    const enableTwitterEnv = process.env.ENABLE_TWITTER === 'true'
+    if (!enableTwitterEnv) {
       console.log('⏭️  跳过 Twitter/X (ENABLE_TWITTER !== true)')
       return []
     }
@@ -244,7 +404,7 @@ class CrawlerService {
 
     try {
       const query = keywords.length > 0
-        ? keywords.map(k => `"${k}"`).join(' OR ')
+        ? keywords.map((k) => `"${k}"`).join(' OR ')
         : 'AI OR GPT OR LLM'
 
       const response = await axios.get('https://api.twitterapi.io/twitter/tweet/advanced_search', {
@@ -254,47 +414,85 @@ class CrawlerService {
       })
 
       const tweets = response.data?.tweets || []
-      const articles: Article[] = tweets.map((t: any) => ({
-        title: t.text?.slice(0, 120) || 'Tweet',
-        url: t.url || `https://twitter.com/i/web/status/${t.id}`,
-        source: 'twitter',
-        publishedAt: t.createdAt ? new Date(t.createdAt) : new Date(),
-        content: t.text || ''
-      }))
+      const articles: Article[] = tweets.map((t: any) => {
+        const likes = this.parseTwitterCount(t.likeCount ?? t.favoriteCount ?? t.favorite_count)
+        const reposts = this.parseTwitterCount(t.retweetCount ?? t.repostCount ?? t.retweet_count)
+        const replies = this.parseTwitterCount(t.replyCount ?? t.reply_count)
+        const followers = this.parseTwitterCount(
+          t.author?.followers ??
+          t.author?.followersCount ??
+          t.author?.followers_count ??
+          t.user?.followers_count
+        )
 
-      console.log(`✓ 爬取 Twitter/X: ${articles.length} 条`)
-      return articles
+        return {
+          title: t.text?.slice(0, 120) || 'Tweet',
+          url: t.url || `https://twitter.com/i/web/status/${t.id}`,
+          source: 'twitter',
+          publishedAt: t.createdAt ? new Date(t.createdAt) : new Date(),
+          content: t.text || '',
+          author: t.author?.userName || t.author?.name || t.user?.screen_name,
+          qualitySignals: {
+            likes,
+            reposts,
+            replies,
+            followers,
+            isReply: Boolean(t.inReplyToStatusId || t.inReplyToStatusIdStr || t.inReplyToTweetId),
+            isQuote: Boolean(t.isQuoteStatus || t.is_quote_status)
+          }
+        }
+      })
+
+      const filtered = articles.filter((article) => this.passesTwitterThresholds(article, currentPolicy))
+
+      console.log(`✓ 爬取 Twitter/X: ${articles.length} 条，过滤后 ${filtered.length} 条`)
+      return filtered
     } catch (error: any) {
       console.error('❌ 爬虫错误 (Twitter/X):', error.message)
       return []
     }
   }
 
-  // ─── 爬取所有源 ───────────────────────────────────────────
-
+  // 爬取所有源
   async crawlAll(keywords: string[] = []): Promise<Article[]> {
-    // 主要信息源：Bing、Google、HackerNews、DuckDuckGo（均无需 API）
-    // Twitter 通过 ENABLE_TWITTER=true 开关控制
+    const policy = await sourcePolicyService.getPolicy()
+
     const [bingArticles, googleArticles, hnArticles, ddgArticles, twitterArticles] = await Promise.all([
-      this.crawlBing(keywords),
-      this.crawlGoogle(keywords),
-      this.crawlHackerNews(),
-      this.crawlDuckDuckGo(keywords),
-      this.crawlTwitter(keywords)
+      policy.sources.bing ? this.crawlBing(keywords) : Promise.resolve([]),
+      policy.sources.google ? this.crawlGoogle(keywords) : Promise.resolve([]),
+      policy.sources.hackernews ? this.crawlHackerNews() : Promise.resolve([]),
+      policy.sources.duckduckgo ? this.crawlDuckDuckGo(keywords) : Promise.resolve([]),
+      this.crawlTwitter(keywords, policy)
     ])
 
     const all = [...bingArticles, ...googleArticles, ...hnArticles, ...ddgArticles, ...twitterArticles]
 
-    // 按 URL 去重
+    const normalized = all
+      .filter((article) => Boolean(article.url && article.title))
+      .map((article) => this.normalizeArticle(article, policy))
+
     const seen = new Set<string>()
-    const deduped = all.filter(a => {
-      if (seen.has(a.url)) return false
-      seen.add(a.url)
+    const deduped = normalized.filter((article) => {
+      const key = `${article.url}|${article.title.toLowerCase().trim()}`
+      if (seen.has(key)) return false
+      seen.add(key)
       return true
     })
 
-    console.log(`📊 合计: ${all.length} 条 → 去重后 ${deduped.length} 条`)
-    return deduped
+    const qualityFiltered = deduped.filter((article) =>
+      this.passesDomainRules(article, policy) && this.passesQualityFilters(article, policy)
+    )
+
+    const prioritized = qualityFiltered.sort((a, b) => {
+      const aPreferred = policy.domainRules.preferlist.some((domain) => a.domain?.includes(domain)) ? 1 : 0
+      const bPreferred = policy.domainRules.preferlist.some((domain) => b.domain?.includes(domain)) ? 1 : 0
+      return bPreferred - aPreferred
+    })
+
+    const finalResult = this.applySourceQuota(prioritized, policy)
+
+    console.log(`📊 合计: ${all.length} 条 → 去重后 ${deduped.length} 条 → 过滤后 ${qualityFiltered.length} 条 → 配额后 ${finalResult.length} 条`)
+    return finalResult
   }
 }
 

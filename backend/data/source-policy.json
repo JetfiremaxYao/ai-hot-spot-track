@@ -1,0 +1,58 @@
+{
+  "reliabilityMode": "strict",
+  "sources": {
+    "google": true,
+    "bing": true,
+    "duckduckgo": true,
+    "hackernews": true,
+    "twitter": false
+  },
+  "paidProviders": {
+    "serpApi": false,
+    "braveSearch": false
+  },
+  "sourceQuota": {
+    "google": 20,
+    "bing": 20,
+    "duckduckgo": 20,
+    "hackernews": 15,
+    "twitter": 5
+  },
+  "twitterThresholds": {
+    "minLikes": 20,
+    "minReposts": 5,
+    "minReplies": 5,
+    "minFollowers": 1000,
+    "allowReplies": false,
+    "allowQuotes": true
+  },
+  "qualityFilters": {
+    "minTitleLength": 16,
+    "minContentLength": 40,
+    "maxPerDomain": 3,
+    "removeTrackingParams": true
+  },
+  "domainRules": {
+    "denylist": [
+      "t.co",
+      "bit.ly",
+      "tinyurl.com",
+      "spam",
+      "clickbait"
+    ],
+    "preferlist": [
+      "openai.com",
+      "anthropic.com",
+      "ai.google.dev",
+      "blog.google",
+      "research.google",
+      "microsoft.com",
+      "meta.com",
+      "huggingface.co",
+      "arxiv.org",
+      "github.com",
+      "theverge.com",
+      "techcrunch.com"
+    ]
+  }
+}

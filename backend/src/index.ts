@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client'
 import keywordRoutes from './api/keywords.js'
 import hotspotRoutes from './api/hotspots.js'
 import searchRoutes from './api/search.js'
+import configRoutes from './api/config.js'
 
 // 导入任务
 import './jobs/hotspotFetcher.js'
@@ -52,6 +53,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 app.use('/api/keywords', keywordRoutes)
 app.use('/api/hotspots', hotspotRoutes)
 app.use('/api/search', searchRoutes)
+app.use('/api/config', configRoutes)
 
 // WebSocket 连接处理
 io.on('connection', (socket: Socket) => {

@@ -245,6 +245,23 @@ Body: { like: boolean }
 Response: { success: true, data: Hotspot }
 ```
 
+### 全站采集策略
+
+```bash
+# 获取当前全站采集策略
+GET /api/config/source-policy
+Response: { success: true, data: SourcePolicy }
+
+# 更新全站采集策略（JSON 持久化）
+PUT /api/config/source-policy
+Body: SourcePolicy
+Response: { success: true, data: SourcePolicy }
+
+# 重置为默认策略
+POST /api/config/source-policy/reset
+Response: { success: true, data: SourcePolicy }
+```
+
 ## 🔄 热点发现流程
 
 ### 自动化工作流
@@ -314,6 +331,13 @@ Response: { success: true, data: Hotspot }
 - 热点数统计
 - 最后更新时间
 
+#### 设置页面 (`/settings`)
+- 全站统一采集策略配置
+- 免费来源开关（Google/Bing/DuckDuckGo/HackerNews）
+- Twitter/X 高门槛过滤（默认关闭）
+- 域名拒绝名单/优先名单
+- 配置持久化到 `backend/data/source-policy.json`
+
 ## 📊 数据模型
 
 ### Keyword 模型
@@ -358,17 +382,47 @@ Response: { success: true, data: Hotspot }
 
 ## 🔧 配置选项
 
+### 全站采集策略（推荐）
+
+- 配置入口：前端 `设置` 页面 (`/settings`)
+- 持久化文件：`backend/data/source-policy.json`
+- 生效方式：保存后立即生效，服务重启后仍保留
+- 默认策略：`strict`（可靠性优先）
+- Twitter/X：默认关闭；同时要求 `ENABLE_TWITTER=true` 且配置 `TWITTERAPI_IO_KEY` 才会实际抓取
+
+`source-policy.json` 示例：
+
+```json
+{
+  "reliabilityMode": "strict",
+  "sources": {
+    "google": true,
+    "bing": true,
+    "duckduckgo": true,
+    "hackernews": true,
+    "twitter": false
+  },
+  "twitterThresholds": {
+    "minLikes": 20,
+    "minReposts": 5,
+    "minReplies": 5,
+    "minFollowers": 1000,
+    "allowReplies": false,
+    "allowQuotes": true
+  }
+}
+```
+
 ### 爬虫配置 (`src/services/crawler.ts`)
 ```typescript
-// 每个数据源的页数限制
-const LIMITS = {
-  HN: 30,        // HackerNews 文章数
-  GitHub: 30,    // GitHub 仓库数
-  Reddit: 30,    // Reddit 帖子数
-}
+// 按策略控制来源开关、配额、域名规则
+const policy = await sourcePolicyService.getPolicy()
 
-// 爬取超时
-const TIMEOUT = 10000 // ms
+// 可靠性过滤：域名规则 + 内容质量 + Twitter高门槛
+const filtered = deduped.filter(article =>
+  passesDomainRules(article, policy) &&
+  passesQualityFilters(article, policy)
+)
 ```
 
 ### AI 分析配置 (`src/services/aiAnalyzer.ts`)
@@ -402,6 +456,9 @@ HOTNESS_THRESHOLD = 6          // 热度 > 6 分自动推送
   - 支持 200+ 模型
   - 价格: 从 Mistral-7B (最便宜) 到 GPT-4 (更准确)
   - 不设置时自动使用本地分析降级方案
+
+- `ENABLE_TWITTER`: 是否允许抓取 Twitter/X（默认建议 `false`）
+- `TWITTERAPI_IO_KEY`: Twitter API Key（仅在启用 Twitter 时需要）
 
 - `NODE_ENV`: 运行环境 (`development` | `production`)
 

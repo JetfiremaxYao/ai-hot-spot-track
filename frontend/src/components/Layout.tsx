@@ -58,6 +58,16 @@ export default function Layout() {
               >
                 关键词
               </Link>
+              <Link
+                to="/settings"
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  isActive('/settings')
+                    ? 'bg-white text-slate-900 shadow-soft'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                设置
+              </Link>
             </div>
 
             {/* 右侧 */}
