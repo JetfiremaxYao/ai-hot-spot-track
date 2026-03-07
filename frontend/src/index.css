@@ -3,21 +3,44 @@
 @tailwind utilities;
 
 * {
-  @apply transition-colors duration-200;
+  @apply transition-colors duration-150;
 }
 
 body {
-  @apply bg-slate-950 text-slate-100;
+  @apply bg-slate-50 text-slate-900 antialiased;
+  background-image: radial-gradient(circle, #e2e8f0 1px, transparent 1px);
+  background-size: 28px 28px;
 }
 
+/* Scrollbar - minimal light style */
 ::-webkit-scrollbar {
-  @apply w-2 h-2;
+  @apply w-1.5 h-1.5;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-slate-900;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700 rounded hover:bg-slate-600;
+  @apply bg-slate-300 rounded-full hover:bg-slate-400;
+}
+
+/* Selection */
+::selection {
+  @apply bg-accent-200 text-accent-900;
+}
+
+/* Focus ring utility */
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-accent-500/40 focus:ring-offset-1;
+}
+
+/* Smooth card hover */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5;
+}
+
+/* Gradient text utility */
+.text-gradient {
+  @apply bg-gradient-to-r from-accent-500 to-cyan-500 bg-clip-text text-transparent;
 }

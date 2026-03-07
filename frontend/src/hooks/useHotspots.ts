@@ -18,7 +18,7 @@ export function useHotspots(filter: HotspotsFilter = {}) {
   const [offset, setOffset] = useState(0)
 
   const pageSize = 20
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevFilterRef = useRef<string>('')
 
   const fetchHotspots = async () => {
@@ -39,28 +39,21 @@ export function useHotspots(filter: HotspotsFilter = {}) {
     }
   }
 
+  // 当 filter 变化时重置分页到第 1 页
   useEffect(() => {
-    // 防抖处理，避免频繁触发
-    const filterStr = JSON.stringify({ ...filter, offset })
-    
-    if (filterStr === prevFilterRef.current) {
-      return
+    const filterStr = JSON.stringify(filter)
+    if (prevFilterRef.current && filterStr !== prevFilterRef.current) {
+      setOffset(0)
     }
-    
     prevFilterRef.current = filterStr
+  }, [filter])
 
-    // 清除之前的定时器
+  // 防抖获取数据
+  useEffect(() => {
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current)
     }
 
-    // 如果只改变了 keyword 或 sortBy，重置到第1页
-    if (offset > 0 && (filter.keyword !== undefined || filter.sortBy !== undefined)) {
-      setOffset(0)
-      return
-    }
-
-    // 延迟 300ms 后执行，避免用户快速输入时频繁请求
     debounceTimer.current = setTimeout(() => {
       fetchHotspots()
     }, 300)
