@@ -18,8 +18,8 @@
 4. **实时推送** - WebSocket推送高热度热点
 5. **响应式UI** - 独特美观的前端设计
 
-### 第二阶段：Agent Skills
-6. **技能封装** - 将功能封装为可复用的Agent Skills
+### 第二阶段：Agent Skills（已完成）
+6. **技能封装** - 已完成总控技能封装，见 `skills/ai-hotspot-orchestrator/SKILL.md`
 
 ---
 

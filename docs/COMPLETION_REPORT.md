@@ -15,6 +15,9 @@
 | 爬虫服务 | 100% | ✅ 完全实现 |
 | AI 分析服务 | 100% | ✅ 完全实现 |
 | 定时任务系统 | 100% | ✅ 完全实现 |
+| Agent Skills 封装 | 100% | ✅ 完全实现 |
+
+> Skills 目录：`skills/ai-hotspot-orchestrator/SKILL.md`
 
 ## 🎯 核心功能盘点
 

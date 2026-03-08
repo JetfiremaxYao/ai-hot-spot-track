@@ -220,7 +220,7 @@ io.on('connection', (socket) => {
   })
 })
 
-const PORT = process.env.PORT || 5000
+const PORT = process.env.PORT || 5001
 httpServer.listen(PORT, () => {
   console.log(`服务器运行在端口 ${PORT}`)
 })
@@ -742,7 +742,7 @@ export interface ApiResponse<T> {
 ```typescript
 import { Keyword, Hotspot } from '../types'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'
 
 // 关键词API
 export const keywordService = {
@@ -823,7 +823,7 @@ export const hotspotService = {
 ```typescript
 import { io, Socket } from 'socket.io-client'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'
 
 let socket: Socket | null = null
 
@@ -997,9 +997,9 @@ export default function Dashboard() {
 
 ---
 
-## 第二阶段：Agent Skills (1周)
+## 第二阶段：Agent Skills (已完成)
 
-### Phase 6: Skills封装
+### Phase 6: Skills封装（已完成）
 
 #### Item 6.1: 设计Skills接口
 - 热点监控技能

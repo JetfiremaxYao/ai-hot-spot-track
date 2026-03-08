@@ -70,6 +70,13 @@
 
 ```
 ai-hot-spot/
+├── skills/                      # Agent Skills（新增，不影响现有业务代码）
+│   ├── README.md
+│   └── ai-hotspot-orchestrator/
+│       ├── SKILL.md
+│       ├── references/
+│       └── evals/
+│
 ├── backend/                    # Express 后端
 │   ├── src/
 │   │   ├── index.ts           # Express 服务器入口
@@ -146,10 +153,10 @@ npm install
 cd backend
 
 # 执行迁移
-npm run migrate
+npm run prisma:migrate
 
 # 插入初始数据
-npm run seed
+npm run db:seed
 ```
 
 ### 4. 配置环境变量
@@ -517,8 +524,10 @@ curl http://localhost:5001/api/health
 ```bash
 # 重置数据库
 cd backend
-npm run migrate:reset
-npm run seed
+# 先删除 SQLite 文件再重新迁移
+rm -f app.db
+npm run prisma:migrate
+npm run db:seed
 ```
 
 ### OpenRouter API 失败

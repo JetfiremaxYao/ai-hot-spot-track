@@ -247,8 +247,8 @@ cd backend
 npm install
 npm run dev        # 启动开发服务器
 npm run build      # 构建生产版本
-npm run migrate    # 数据库迁移
-npm run seed       # 初始化数据
+npm run prisma:migrate    # 数据库迁移
+npm run db:seed           # 初始化数据
 
 # 前端开发
 cd frontend
@@ -401,7 +401,7 @@ curl http://localhost:5001/api/health
 
 ### "API 返回 500"
 查看后端日志，常见原因：
-- 数据库未初始化: `npm run migrate`
+- 数据库未初始化: `npm run prisma:migrate`
 - 缺少环境变量检查
 
 ### "WebSocket 连接失败"
@@ -500,8 +500,9 @@ curl http://localhost:5001/api/health
 3. **重置数据库**
    ```bash
    cd backend
-   npm run migrate -- --force
-   npm run seed
+   rm -f app.db
+   npm run prisma:migrate
+   npm run db:seed
    ```
 
 4. **清理依赖**

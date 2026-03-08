@@ -44,7 +44,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:5000'
+      '/api': 'http://localhost:5001'
     }
   },
   build: {
@@ -511,21 +511,22 @@ npm run dev          # http://localhost:3000
 # 后端
 cd backend
 npm install
-npm run dev:db      # SQLite迁移
-npm run dev          # http://localhost:5000
+npm run prisma:migrate      # SQLite迁移
+npm run db:seed             # 初始化种子数据
+npm run dev          # http://localhost:5001
 ```
 
 ### 环境变量
 
 ```bash
 # .env.local (前端)
-VITE_API_BASE_URL=http://localhost:5000
+VITE_API_BASE_URL=http://localhost:5001
 
 # .env (后端)
 DATABASE_URL="file:./app.db"
 OPENROUTER_API_KEY=your_key_here
 NODE_ENV=development
-PORT=5000
+PORT=5001
 ```
 
 ### Docker部署（可选）
@@ -536,7 +537,7 @@ services:
   backend:
     build: ./backend
     ports:
-      - "5000:5000"
+      - "5001:5001"
     volumes:
       - ./backend/app.db:/app/app.db
   

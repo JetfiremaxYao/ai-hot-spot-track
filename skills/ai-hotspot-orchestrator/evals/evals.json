@@ -1,0 +1,23 @@
+{
+  "skill_name": "ai-hotspot-orchestrator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "请帮我新增关键词 'Anthropic MCP'，并把当前关键词状态汇总给我。",
+      "expected_output": "能够路由到 keywords.manage，包含 create 动作结果与关键词统计摘要。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "立刻刷新一次热点，然后告诉我如何确认刷新完成。",
+      "expected_output": "能够路由到 hotspots.refresh，返回任务启动信息并提示 refresh:done 或后续查询。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "搜索 'OpenAI Agents SDK'，先用数据库模式，不够再用实时模式。",
+      "expected_output": "能够路由到 search.run，并给出 db/live 的执行策略与结果汇总。",
+      "files": []
+    }
+  ]
+}
