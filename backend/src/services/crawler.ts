@@ -141,15 +141,116 @@ class CrawlerService {
   }
 
   private parseTwitterCount(value: any): number {
+    if (typeof value === 'string') {
+      const trimmed = value.trim().toUpperCase()
+      const kMatch = trimmed.match(/^([\d.]+)K$/)
+      const mMatch = trimmed.match(/^([\d.]+)M$/)
+      if (kMatch) {
+        const base = Number(kMatch[1])
+        return Number.isFinite(base) ? Math.round(base * 1000) : 0
+      }
+      if (mMatch) {
+        const base = Number(mMatch[1])
+        return Number.isFinite(base) ? Math.round(base * 1000000) : 0
+      }
+    }
+
     const n = Number(value)
     return Number.isFinite(n) && n > 0 ? n : 0
+  }
+
+  private parseTwitterBoolean(value: any): boolean {
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'number') return value > 0
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase()
+      return normalized === 'true' || normalized === '1' || normalized === 'yes'
+    }
+    return false
+  }
+
+  private getTwitterSignals(t: any) {
+    const metrics = t.publicMetrics || t.public_metrics || t.metrics || {}
+
+    const likes = this.parseTwitterCount(
+      t.likeCount ?? t.favoriteCount ?? t.favorite_count ?? metrics.like_count ?? metrics.likes
+    )
+    const reposts = this.parseTwitterCount(
+      t.retweetCount ?? t.repostCount ?? t.retweet_count ?? metrics.retweet_count ?? metrics.reposts
+    )
+    const replies = this.parseTwitterCount(
+      t.replyCount ?? t.reply_count ?? metrics.reply_count ?? metrics.replies
+    )
+    const followers = this.parseTwitterCount(
+      t.author?.followers ??
+      t.author?.followersCount ??
+      t.author?.followers_count ??
+      t.user?.followers_count ??
+      t.author?.publicMetrics?.followers_count ??
+      t.user?.public_metrics?.followers_count
+    )
+
+    const referencedTweets: any[] = Array.isArray(t.referencedTweets)
+      ? t.referencedTweets
+      : Array.isArray(t.referenced_tweets)
+        ? t.referenced_tweets
+        : []
+
+    const isReplyFromRefs = referencedTweets.some((item) => item?.type === 'replied_to')
+    const isQuoteFromRefs = referencedTweets.some((item) => item?.type === 'quoted')
+    const isRetweetFromRefs = referencedTweets.some((item) => item?.type === 'retweeted')
+
+    const isReply = Boolean(
+      t.inReplyToStatusId ||
+      t.inReplyToStatusIdStr ||
+      t.inReplyToTweetId ||
+      t.in_reply_to_status_id ||
+      t.in_reply_to_tweet_id ||
+      isReplyFromRefs
+    )
+
+    const isQuote = this.parseTwitterBoolean(t.isQuoteStatus ?? t.is_quote_status) || isQuoteFromRefs
+    const isRetweet = this.parseTwitterBoolean(t.isRetweet ?? t.is_retweet) || isRetweetFromRefs
+
+    return {
+      likes,
+      reposts,
+      replies,
+      followers,
+      isReply,
+      isQuote,
+      isRetweet
+    }
+  }
+
+  private isLikelyReplyText(text: string): boolean {
+    const trimmed = text.trim()
+    if (!trimmed) return false
+    if (/^@[A-Za-z0-9_]{1,20}\b/.test(trimmed)) return true
+    if (/^RT\s+@/i.test(trimmed)) return true
+    return false
   }
 
   private passesTwitterThresholds(article: Article, policy: SourcePolicy): boolean {
     const thresholds = policy.twitterThresholds
     const signals = article.qualitySignals || {}
+    const strict = policy.reliabilityMode === 'strict'
+
+    // 严格模式下启用最低安全门槛，避免配置被降到过低后抓入大量噪音 tweet。
+    const effectiveMinLikes = strict ? Math.max(thresholds.minLikes, 10) : thresholds.minLikes
+    const effectiveMinReposts = strict ? Math.max(thresholds.minReposts, 2) : thresholds.minReposts
+    const effectiveMinReplies = strict ? Math.max(thresholds.minReplies, 2) : thresholds.minReplies
+    const effectiveMinFollowers = strict ? Math.max(thresholds.minFollowers, 500) : thresholds.minFollowers
+
+    if ((signals as any).isRetweet) {
+      return false
+    }
 
     if (!thresholds.allowReplies && signals.isReply) {
+      return false
+    }
+
+    if (!thresholds.allowReplies && this.isLikelyReplyText(article.content || article.title || '')) {
       return false
     }
 
@@ -157,19 +258,19 @@ class CrawlerService {
       return false
     }
 
-    if ((signals.likes || 0) < thresholds.minLikes) {
+    if ((signals.likes || 0) < effectiveMinLikes) {
       return false
     }
 
-    if ((signals.reposts || 0) < thresholds.minReposts) {
+    if ((signals.reposts || 0) < effectiveMinReposts) {
       return false
     }
 
-    if ((signals.replies || 0) < thresholds.minReplies) {
+    if ((signals.replies || 0) < effectiveMinReplies) {
       return false
     }
 
-    if ((signals.followers || 0) < thresholds.minFollowers) {
+    if ((signals.followers || 0) < effectiveMinFollowers) {
       return false
     }
 
@@ -431,15 +532,7 @@ class CrawlerService {
 
       const tweets = response.data?.tweets || []
       const articles: Article[] = tweets.map((t: any) => {
-        const likes = this.parseTwitterCount(t.likeCount ?? t.favoriteCount ?? t.favorite_count)
-        const reposts = this.parseTwitterCount(t.retweetCount ?? t.repostCount ?? t.retweet_count)
-        const replies = this.parseTwitterCount(t.replyCount ?? t.reply_count)
-        const followers = this.parseTwitterCount(
-          t.author?.followers ??
-          t.author?.followersCount ??
-          t.author?.followers_count ??
-          t.user?.followers_count
-        )
+        const signals = this.getTwitterSignals(t)
 
         return {
           title: t.text?.slice(0, 120) || 'Tweet',
@@ -448,14 +541,7 @@ class CrawlerService {
           publishedAt: t.createdAt ? new Date(t.createdAt) : new Date(),
           content: t.text || '',
           author: t.author?.userName || t.author?.name || t.user?.screen_name,
-          qualitySignals: {
-            likes,
-            reposts,
-            replies,
-            followers,
-            isReply: Boolean(t.inReplyToStatusId || t.inReplyToStatusIdStr || t.inReplyToTweetId),
-            isQuote: Boolean(t.isQuoteStatus || t.is_quote_status)
-          }
+          qualitySignals: signals
         }
       })
 

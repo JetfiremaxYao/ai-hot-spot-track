@@ -3,7 +3,6 @@ import { prisma } from '../index.js'
 import { ApiResponse } from '../types/index.js'
 import crawlerService from '../services/crawler.js'
 import aiAnalyzer from '../services/aiAnalyzer.js'
-import titleTranslator from '../services/titleTranslator.js'
 
 const router = Router()
 
@@ -36,7 +35,6 @@ router.get('/', async (req: Request, res: Response) => {
 
       for (const article of sliced) {
         try {
-          const translatedTitle = await titleTranslator.translateTitle(article.title)
           const analysis = await aiAnalyzer.analyzeHotspot(
             article.title,
             article.content || article.title,
@@ -45,7 +43,7 @@ router.get('/', async (req: Request, res: Response) => {
 
           analyzed.push({
             id: Date.now() + analyzed.length,
-            title: translatedTitle,
+            title: article.title,
             summary: analysis.summary,
             content: article.content || '',
             source: article.source,
@@ -61,10 +59,9 @@ router.get('/', async (req: Request, res: Response) => {
             keywords: []
           })
         } catch (error) {
-          const translatedTitle = await titleTranslator.translateTitle(article.title)
           analyzed.push({
             id: Date.now() + analyzed.length,
-            title: translatedTitle,
+            title: article.title,
             summary: article.content?.substring(0, 200) || '',
             content: article.content || '',
             source: article.source,
