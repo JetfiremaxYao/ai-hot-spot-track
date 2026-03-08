@@ -29,7 +29,7 @@
 - 关键词管理（创建、删除、暂停/激活）
 - 热点列表浏览（分页、过滤、排序）
 - 标记已读、保存、点赞等交互
-- 深色主题 UI，支持响应式设计
+- 浅色主题 UI，支持响应式设计
 
 ### 5. **数据持久化** 💾
 - SQLite 轻量级数据库
@@ -45,7 +45,7 @@
 前端:
 ├── React 19.2.0 + TypeScript
 ├── Vite 7.0.0 (快速开发和构建)
-├── TailwindCSS v3 (深色主题 + 自定义配色)
+├── TailwindCSS v3 (浅色主题 + 自定义配色)
 ├── React Router v6 (页面路由)
 ├── Socket.io Client (实时推送)
 └── Axios (HTTP 客户端)
@@ -213,6 +213,69 @@ npm run dev
 - **API 文档**: http://localhost:5001/api
 - **WebSocket**: ws://localhost:5001
 
+### 7. 快速配置清单（建议按此顺序）
+
+1. 复制环境变量模板并填写：
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+2. 确认关键变量：
+- `backend/.env`:
+  - `PORT=5001`
+  - `FRONTEND_URL=http://localhost:3000`
+  - `DATABASE_URL="file:./app.db"`
+  - `OPENROUTER_API_KEY=`（可空，空则自动降级本地分析）
+- `frontend/.env`:
+  - `VITE_API_BASE_URL=http://localhost:5001`
+
+3. 初始化数据库：
+```bash
+cd backend
+npm run prisma:migrate
+npm run db:seed
+```
+
+4. 启动服务：
+```bash
+# 终端1
+cd backend && npm run dev
+
+# 终端2
+cd frontend && npm run dev
+```
+
+5. 验证服务可用：
+```bash
+curl http://localhost:5001/api/health
+```
+
+### 8. 直接使用 Skills（Agent 模式）
+
+Skills 已放在仓库目录：`skills/ai-hotspot-orchestrator/SKILL.md`。
+
+建议用法：
+1. 保持后端服务已启动（至少 `backend` 要运行）。
+2. 在 Agent 对话中直接提出任务，技能会按现有 API 自动路由。
+3. 若要查看技能规范与输入输出协议，先读：
+   - `skills/README.md`
+   - `skills/ai-hotspot-orchestrator/SKILL.md`
+   - `skills/ai-hotspot-orchestrator/references/api-contract.md`
+
+可直接复制的任务示例：
+```text
+帮我新增关键词 "Anthropic MCP"，然后刷新一次热点，并按热度返回前10条。
+```
+
+```text
+请用实时模式搜索 "OpenAI Agents SDK"，并给我来源分布与后续监控建议。
+```
+
+```text
+把 source-policy 调整为 strict，开启 google/bing/hackernews，并发送一次测试邮件。
+```
+
 ## 📡 API 端点
 
 ### 关键词管理
@@ -333,11 +396,11 @@ Response: { success: true, message: string }
 
 ## 🎨 用户界面
 
-### 深色主题配色
+### 浅色主题配色
 
-- **品牌色**: 紫色 → 蓝色 → 青色 → 翡翠绿
-- **背景**: 纯黑到深灰渐变
-- **高对比度**: 优化夜间阅读体验
+- **品牌色**: 蓝绿渐变点缀 + 中性灰层次
+- **背景**: 白色与浅灰卡片分层
+- **可读性**: 日间阅读优先，保持高对比文本
 
 ### 页面结构
 
