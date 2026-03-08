@@ -3,6 +3,17 @@ import { prisma, io } from '../index.js'
 import { ApiResponse } from '../types/index.js'
 import crawlerService from '../services/crawler.js'
 import aiAnalyzer from '../services/aiAnalyzer.js'
+import titleTranslator from '../services/titleTranslator.js'
+import emailNotifier from '../services/emailNotifier.js'
+import {
+  HotspotImportance,
+  HotspotSortBy,
+  HotspotTimeRange,
+  matchImportanceLevel,
+  matchTimeRange,
+  sortHotspots,
+  toHotspotWithImportance
+} from '../utils/hotspotRanking.js'
 
 const router = Router()
 
@@ -12,6 +23,8 @@ router.get('/', async (req: Request, res: Response) => {
     const {
       keyword,
       source,
+      importance = 'all',
+      timeRange = 'all',
       minHotness = '0',
       maxHotness = '10',
       sortBy = 'hotness',
@@ -44,7 +57,14 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     if (source && typeof source === 'string') {
-      where.source = source
+      const sourceList = source
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean)
+
+      if (sourceList.length > 0) {
+        where.source = sourceList.length === 1 ? sourceList[0] : { in: sourceList }
+      }
     }
 
     if (minHotness !== undefined || maxHotness !== undefined) {
@@ -66,43 +86,37 @@ router.get('/', async (req: Request, res: Response) => {
       where.isSaved = false
     }
 
-    // 排序
-    const orderBy: any = {}
-    switch (sortBy) {
-      case 'relevance':
-        orderBy.relevanceScore = 'desc'
-        break
-      case 'credibility':
-        orderBy.credibilityScore = 'desc'
-        break
-      case 'time':
-        orderBy.publishedAt = 'desc'
-        break
-      case 'hotness':
-      default:
-        orderBy.hotnessScore = 'desc'
-    }
+    const limitNum = Math.min(parseInt(limit as string) || 20, 100)
+    const offsetNum = parseInt(offset as string) || 0
 
-    const [hotspots, total] = await Promise.all([
-      prisma.hotspot.findMany({
-        where,
-        orderBy,
-        take: Math.min(parseInt(limit as string) || 20, 100),
-        skip: parseInt(offset as string) || 0,
-        include: {
-          keywords: true
-        }
-      }),
-      prisma.hotspot.count({ where })
-    ])
+    const allMatchedHotspots = await prisma.hotspot.findMany({
+      where,
+      include: {
+        keywords: true
+      }
+    })
+
+    const filteredByTime = allMatchedHotspots.filter((hotspot) =>
+      matchTimeRange(hotspot, timeRange as HotspotTimeRange)
+    )
+
+    const filteredByImportance = filteredByTime.filter((hotspot) =>
+      matchImportanceLevel(hotspot, importance as HotspotImportance)
+    )
+
+    const sortedHotspots = sortHotspots(filteredByImportance, sortBy as HotspotSortBy)
+      .map(toHotspotWithImportance)
+
+    const total = sortedHotspots.length
+    const hotspots = sortedHotspots.slice(offsetNum, offsetNum + limitNum)
 
     const response: ApiResponse<any> = {
       success: true,
       data: {
         hotspots,
         total,
-        page: Math.floor((parseInt(offset as string) || 0) / (parseInt(limit as string) || 20)) + 1,
-        pageSize: parseInt(limit as string) || 20
+        page: Math.floor(offsetNum / limitNum) + 1,
+        pageSize: limitNum
       }
     }
 
@@ -193,6 +207,9 @@ router.post('/refresh', async (req: Request, res: Response) => {
             keywordNames
           )
 
+          // 仅翻译标题，正文不翻译
+          const translatedTitle = await titleTranslator.translateTitle(article.title)
+
           // 匹配关键词
           const matchedKeywords = activeKeywords.filter(kw =>
             article.title.toLowerCase().includes(kw.name.toLowerCase()) ||
@@ -202,12 +219,13 @@ router.post('/refresh', async (req: Request, res: Response) => {
           // 创建热点
           const hotspot = await prisma.hotspot.create({
             data: {
-              title: article.title.substring(0, 500),
+              title: translatedTitle.substring(0, 500),
               summary: analysis.summary,
               content: (article.content || '').substring(0, 2000),
               source: article.source as any,
               sourceUrl: article.url,
               relevanceScore: analysis.relevanceScore,
+              hotnessScore: analysis.hotnessScore,
               credibilityScore: analysis.credibilityScore,
               keywords: {
                 connect: matchedKeywords.map(kw => ({ id: kw.id }))
@@ -215,6 +233,17 @@ router.post('/refresh', async (req: Request, res: Response) => {
               publishedAt: article.publishedAt || new Date()
             },
             include: { keywords: true }
+          })
+
+          await emailNotifier.notifyUltraHotspot({
+            title: hotspot.title,
+            summary: hotspot.summary,
+            source: hotspot.source,
+            sourceUrl: hotspot.sourceUrl,
+            hotnessScore: hotspot.hotnessScore,
+            relevanceScore: hotspot.relevanceScore,
+            credibilityScore: hotspot.credibilityScore,
+            publishedAt: hotspot.publishedAt
           })
 
           newHotspotCount++

@@ -55,5 +55,11 @@
       "theverge.com",
       "techcrunch.com"
     ]
+  },
+  "notification": {
+    "enableEmailPush": false,
+    "ultraHotThreshold": 8,
+    "recipientEmails": [],
+    "smtpProfiles": []
   }
 }

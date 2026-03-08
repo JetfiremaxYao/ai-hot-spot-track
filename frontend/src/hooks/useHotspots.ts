@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { hotspotService } from '../services/api.js'
-import { Hotspot } from '../types/index.js'
+import { Hotspot, HotspotImportance, HotspotSortBy, HotspotTimeRange } from '../types/index.js'
 
 interface HotspotsFilter {
   keyword?: string
   source?: string
-  sortBy?: string
+  sortBy?: HotspotSortBy
+  importance?: HotspotImportance
+  timeRange?: HotspotTimeRange
   isRead?: boolean
   isSaved?: boolean
 }

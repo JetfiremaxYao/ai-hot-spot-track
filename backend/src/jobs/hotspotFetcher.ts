@@ -2,6 +2,8 @@ import cron from 'node-cron'
 import { prisma, io } from '../index.js'
 import crawlerService from '../services/crawler.js'
 import aiAnalyzer from '../services/aiAnalyzer.js'
+import titleTranslator from '../services/titleTranslator.js'
+import emailNotifier from '../services/emailNotifier.js'
 
 /**
  * 定时爬虫任务 - 每30分钟运行一次
@@ -75,6 +77,9 @@ cron.schedule('*/30 * * * *', async () => {
           keywordNames
         )
 
+        // 仅翻译标题，正文保持原文
+        const translatedTitle = await titleTranslator.translateTitle(article.title)
+
         // 匹配相关关键词
         const matchedKeywords = activeKeywords.filter(kw =>
           article.title.toLowerCase().includes(kw.name.toLowerCase()) ||
@@ -84,7 +89,7 @@ cron.schedule('*/30 * * * *', async () => {
         // 创建热点记录
         const hotspot = await prisma.hotspot.create({
           data: {
-            title: article.title.substring(0, 500),
+            title: translatedTitle.substring(0, 500),
             summary: analysis.summary,
             content: (article.content || '').substring(0, 2000),
             source: article.source as any,
@@ -101,6 +106,17 @@ cron.schedule('*/30 * * * *', async () => {
             }
           },
           include: { keywords: true }
+        })
+
+        await emailNotifier.notifyUltraHotspot({
+          title: hotspot.title,
+          summary: hotspot.summary,
+          source: hotspot.source,
+          sourceUrl: hotspot.sourceUrl,
+          hotnessScore: hotspot.hotnessScore,
+          relevanceScore: hotspot.relevanceScore,
+          credibilityScore: hotspot.credibilityScore,
+          publishedAt: hotspot.publishedAt
         })
 
         newHotspotCount++

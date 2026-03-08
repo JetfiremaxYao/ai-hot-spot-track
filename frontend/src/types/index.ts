@@ -29,7 +29,12 @@ export interface Hotspot {
   keywords: Keyword[]
   viewCount: number
   likeCount: number
+  importanceScore?: number
 }
+
+export type HotspotSortBy = 'hotness' | 'published' | 'discovered' | 'importance' | 'relevance'
+export type HotspotImportance = 'all' | 'high' | 'medium' | 'low'
+export type HotspotTimeRange = 'all' | '1h' | '6h' | '24h' | '3d' | '7d' | '30d'
 
 export interface ApiResponse<T> {
   success: boolean
@@ -83,5 +88,19 @@ export interface SourcePolicy {
   domainRules: {
     denylist: string[]
     preferlist: string[]
+  }
+  notification: {
+    enableEmailPush: boolean
+    ultraHotThreshold: number
+    recipientEmails: string[]
+    smtpProfiles: Array<{
+      recipientEmail: string
+      smtpHost: string
+      smtpPort: number
+      smtpUser: string
+      smtpPass: string
+      smtpFrom?: string
+      enabled: boolean
+    }>
   }
 }

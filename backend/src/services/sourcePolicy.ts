@@ -61,6 +61,12 @@ const DEFAULT_POLICY: SourcePolicy = {
       'theverge.com',
       'techcrunch.com'
     ]
+  },
+  notification: {
+    enableEmailPush: false,
+    ultraHotThreshold: 8,
+    recipientEmails: [],
+    smtpProfiles: []
   }
 }
 
@@ -119,6 +125,44 @@ function normalizeStringList(value: any, fallback: string[]): string[] {
   )
 }
 
+function normalizeEmailList(value: any, fallback: string[]): string[] {
+  const list = normalizeStringList(value, fallback)
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return list.filter((item) => emailRegex.test(item))
+}
+
+function normalizeSmtpProfiles(value: any, fallback: SourcePolicy['notification']['smtpProfiles']): SourcePolicy['notification']['smtpProfiles'] {
+  if (!Array.isArray(value)) return fallback
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  const profiles = value
+    .map((item: any) => {
+      const recipientEmail = typeof item?.recipientEmail === 'string' ? item.recipientEmail.trim().toLowerCase() : ''
+      const smtpHost = typeof item?.smtpHost === 'string' ? item.smtpHost.trim() : ''
+      const smtpUser = typeof item?.smtpUser === 'string' ? item.smtpUser.trim() : ''
+      const smtpPass = typeof item?.smtpPass === 'string' ? item.smtpPass.trim() : ''
+      const smtpFrom = typeof item?.smtpFrom === 'string' ? item.smtpFrom.trim() : ''
+      const smtpPort = clampInteger(item?.smtpPort, 587, 1, 65535)
+      const enabled = toBoolean(item?.enabled, true)
+
+      if (!emailRegex.test(recipientEmail)) return null
+      if (!smtpHost || !smtpUser || !smtpPass) return null
+
+      return {
+        recipientEmail,
+        smtpHost,
+        smtpPort,
+        smtpUser,
+        smtpPass,
+        smtpFrom,
+        enabled
+      }
+    })
+    .filter(Boolean) as SourcePolicy['notification']['smtpProfiles']
+
+  return profiles
+}
+
 function sanitizePolicy(input: DeepPartial<SourcePolicy>): SourcePolicy {
   const merged = mergeDeep(DEFAULT_POLICY, input)
 
@@ -160,6 +204,15 @@ function sanitizePolicy(input: DeepPartial<SourcePolicy>): SourcePolicy {
     domainRules: {
       denylist: normalizeStringList(merged.domainRules.denylist, DEFAULT_POLICY.domainRules.denylist),
       preferlist: normalizeStringList(merged.domainRules.preferlist, DEFAULT_POLICY.domainRules.preferlist)
+    },
+    notification: {
+      enableEmailPush: toBoolean(merged.notification.enableEmailPush, DEFAULT_POLICY.notification.enableEmailPush),
+      ultraHotThreshold: Math.min(
+        10,
+        Math.max(6, Number(toNumber(merged.notification.ultraHotThreshold, DEFAULT_POLICY.notification.ultraHotThreshold).toFixed(1)))
+      ),
+      recipientEmails: normalizeEmailList(merged.notification.recipientEmails, DEFAULT_POLICY.notification.recipientEmails),
+      smtpProfiles: normalizeSmtpProfiles(merged.notification.smtpProfiles, DEFAULT_POLICY.notification.smtpProfiles)
     }
   }
 }

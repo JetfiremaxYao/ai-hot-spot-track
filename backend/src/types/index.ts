@@ -70,4 +70,18 @@ export interface SourcePolicy {
     denylist: string[]
     preferlist: string[]
   }
+  notification: {
+    enableEmailPush: boolean
+    ultraHotThreshold: number
+    recipientEmails: string[]
+    smtpProfiles: Array<{
+      recipientEmail: string
+      smtpHost: string
+      smtpPort: number
+      smtpUser: string
+      smtpPass: string
+      smtpFrom?: string
+      enabled: boolean
+    }>
+  }
 }

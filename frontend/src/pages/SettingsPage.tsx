@@ -13,12 +13,25 @@ function textToList(text: string): string[] {
     .filter(Boolean)
 }
 
+function createEmptySmtpProfile(): SourcePolicy['notification']['smtpProfiles'][number] {
+  return {
+    recipientEmail: '',
+    smtpHost: 'smtp.qq.com',
+    smtpPort: 465,
+    smtpUser: '',
+    smtpPass: '',
+    smtpFrom: '',
+    enabled: true
+  }
+}
+
 export default function SettingsPage() {
   const [policy, setPolicy] = useState<SourcePolicy | null>(null)
   const [denylistText, setDenylistText] = useState('')
   const [preferlistText, setPreferlistText] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testingEmail, setTestingEmail] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -27,9 +40,19 @@ export default function SettingsPage() {
       setLoading(true)
       setError(null)
       const data = await configService.getSourcePolicy()
-      setPolicy(data)
+      const smtpProfiles = data.notification.smtpProfiles.length > 0
+        ? data.notification.smtpProfiles
+        : [createEmptySmtpProfile()]
+
       setDenylistText(listToText(data.domainRules.denylist))
       setPreferlistText(listToText(data.domainRules.preferlist))
+      setPolicy({
+        ...data,
+        notification: {
+          ...data.notification,
+          smtpProfiles
+        }
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载配置失败')
     } finally {
@@ -61,13 +84,32 @@ export default function SettingsPage() {
         domainRules: {
           denylist: textToList(denylistText),
           preferlist: textToList(preferlistText)
+        },
+        notification: {
+          ...policy.notification,
+          smtpProfiles: policy.notification.smtpProfiles.map((profile) => ({
+            ...profile,
+            recipientEmail: profile.recipientEmail.trim().toLowerCase(),
+            smtpHost: profile.smtpHost.trim(),
+            smtpUser: profile.smtpUser.trim(),
+            smtpPass: profile.smtpPass.trim(),
+            smtpFrom: (profile.smtpFrom || '').trim()
+          }))
         }
       }
 
       const saved = await configService.updateSourcePolicy(nextPolicy)
-      setPolicy(saved)
       setDenylistText(listToText(saved.domainRules.denylist))
       setPreferlistText(listToText(saved.domainRules.preferlist))
+      setPolicy({
+        ...saved,
+        notification: {
+          ...saved.notification,
+          smtpProfiles: saved.notification.smtpProfiles.length > 0
+            ? saved.notification.smtpProfiles
+            : [createEmptySmtpProfile()]
+        }
+      })
       setMessage('已保存，全站立即生效（重启后仍保留）')
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存失败')
@@ -82,15 +124,74 @@ export default function SettingsPage() {
       setMessage(null)
       setError(null)
       const reset = await configService.resetSourcePolicy()
-      setPolicy(reset)
       setDenylistText(listToText(reset.domainRules.denylist))
       setPreferlistText(listToText(reset.domainRules.preferlist))
+      setPolicy({
+        ...reset,
+        notification: {
+          ...reset.notification,
+          smtpProfiles: reset.notification.smtpProfiles.length > 0
+            ? reset.notification.smtpProfiles
+            : [createEmptySmtpProfile()]
+        }
+      })
       setMessage('已恢复默认策略')
     } catch (err) {
       setError(err instanceof Error ? err.message : '重置失败')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSendTestEmail = async () => {
+    if (!policy) return
+
+    try {
+      setTestingEmail(true)
+      setMessage(null)
+      setError(null)
+
+      await configService.sendTestEmail(policy.notification.smtpProfiles)
+      setMessage('测试邮件发送成功，请检查收件箱')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '发送测试邮件失败')
+    } finally {
+      setTestingEmail(false)
+    }
+  }
+
+  const addSmtpProfile = () => {
+    if (!policy) return
+    updatePolicy('notification', {
+      ...policy.notification,
+      smtpProfiles: [...policy.notification.smtpProfiles, createEmptySmtpProfile()]
+    })
+  }
+
+  const removeSmtpProfile = (index: number) => {
+    if (!policy) return
+    const next = policy.notification.smtpProfiles.filter((_, idx) => idx !== index)
+    updatePolicy('notification', {
+      ...policy.notification,
+      smtpProfiles: next.length > 0 ? next : [createEmptySmtpProfile()]
+    })
+  }
+
+  const updateSmtpProfile = <K extends keyof SourcePolicy['notification']['smtpProfiles'][number]>(
+    index: number,
+    key: K,
+    value: SourcePolicy['notification']['smtpProfiles'][number][K]
+  ) => {
+    if (!policy) return
+
+    const nextProfiles = policy.notification.smtpProfiles.map((profile, idx) =>
+      idx === index ? { ...profile, [key]: value } : profile
+    )
+
+    updatePolicy('notification', {
+      ...policy.notification,
+      smtpProfiles: nextProfiles
+    })
   }
 
   if (loading) {
@@ -247,6 +348,160 @@ export default function SettingsPage() {
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft space-y-4">
+        <h3 className="text-base font-semibold text-slate-800">超高热点邮件推送</h3>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+          邮件推送需要两个条件同时满足：
+          1) 至少添加一组启用状态的 邮箱 + SMTP；
+          2) 该邮箱服务方允许 SMTP 并使用正确授权码。
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          QQ 邮箱对齐说明：
+          发送邮件服务器 `smtp.qq.com`，SSL 端口 `465`（或 `587`）；
+          用户名/帐户为完整 QQ 邮箱地址；密码为 SMTP 授权码（非登录密码）。
+          接收邮件服务器 `pop.qq.com:995` 仅用于收信，不影响本系统发信。
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            开启邮件推送
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-accent-500"
+              checked={policy.notification.enableEmailPush}
+              onChange={(e) => updatePolicy('notification', {
+                ...policy.notification,
+                enableEmailPush: e.target.checked
+              })}
+            />
+          </label>
+
+          <label className="text-sm text-slate-600">
+            <span className="mb-1 block">超高热点阈值（6-10）</span>
+            <input
+              type="number"
+              min={6}
+              max={10}
+              step={0.1}
+              value={policy.notification.ultraHotThreshold}
+              onChange={(e) => updatePolicy('notification', {
+                ...policy.notification,
+                ultraHotThreshold: Number(e.target.value) || 8
+              })}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-800 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+            />
+          </label>
+        </div>
+
+        <div className="space-y-3">
+          {policy.notification.smtpProfiles.map((profile, index) => (
+            <div key={index} className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-700">邮箱服务器配置 #{index + 1}</p>
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1 text-xs text-slate-600">
+                    启用
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-accent-500"
+                      checked={profile.enabled}
+                      onChange={(e) => updateSmtpProfile(index, 'enabled', e.target.checked)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeSmtpProfile(index)}
+                    className="rounded border border-rose-200 bg-white px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                  >
+                    删除
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <label className="text-xs text-slate-600">
+                  电子邮件地址（接收提醒）
+                  <input
+                    type="email"
+                    value={profile.recipientEmail}
+                    onChange={(e) => updateSmtpProfile(index, 'recipientEmail', e.target.value)}
+                    placeholder="your_mail@qq.com"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+                  />
+                </label>
+
+                <label className="text-xs text-slate-600">
+                  发送邮件服务器（SMTP Host）
+                  <input
+                    type="text"
+                    value={profile.smtpHost}
+                    onChange={(e) => updateSmtpProfile(index, 'smtpHost', e.target.value)}
+                    placeholder="smtp.qq.com"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+                  />
+                </label>
+
+                <label className="text-xs text-slate-600">
+                  发送服务器端口（SMTP Port）
+                  <input
+                    type="number"
+                    min={1}
+                    max={65535}
+                    value={profile.smtpPort}
+                    onChange={(e) => updateSmtpProfile(index, 'smtpPort', Number(e.target.value) || 587)}
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+                  />
+                </label>
+
+                <label className="text-xs text-slate-600">
+                  用户名/帐户（SMTP User）
+                  <input
+                    type="text"
+                    value={profile.smtpUser}
+                    onChange={(e) => updateSmtpProfile(index, 'smtpUser', e.target.value)}
+                    placeholder="sender@qq.com"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+                  />
+                </label>
+
+                <label className="text-xs text-slate-600">
+                  密码（SMTP 授权码）
+                  <input
+                    type="password"
+                    value={profile.smtpPass}
+                    onChange={(e) => updateSmtpProfile(index, 'smtpPass', e.target.value)}
+                    placeholder="授权码"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+                  />
+                </label>
+
+                <label className="text-xs text-slate-600">
+                  发件人地址（SMTP From，可选）
+                  <input
+                    type="text"
+                    value={profile.smtpFrom || ''}
+                    onChange={(e) => updateSmtpProfile(index, 'smtpFrom', e.target.value)}
+                    placeholder="sender@qq.com"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none"
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addSmtpProfile}
+            className="rounded-lg border border-accent-200 bg-accent-50 px-3 py-2 text-sm font-medium text-accent-700 hover:bg-accent-100"
+          >
+            + 添加邮箱 SMTP
+          </button>
+
+          <span className="block text-xs text-slate-500">
+            建议添加后先点击“发送测试邮件”逐条验证配置。
+          </span>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-soft space-y-4">
         <h3 className="text-base font-semibold text-slate-800">域名规则（每行或逗号分隔）</h3>
         <div className="grid gap-3 lg:grid-cols-2">
           <label className="text-sm text-slate-600">
@@ -308,8 +563,15 @@ export default function SettingsPage() {
           {saving ? '保存中...' : '保存全站配置'}
         </button>
         <button
+          onClick={handleSendTestEmail}
+          disabled={saving || testingEmail}
+          className="rounded-lg border border-accent-200 bg-accent-50 px-4 py-2 text-sm font-medium text-accent-700 hover:bg-accent-100 disabled:opacity-50"
+        >
+          {testingEmail ? '发送中...' : '发送测试邮件'}
+        </button>
+        <button
           onClick={handleReset}
-          disabled={saving}
+          disabled={saving || testingEmail}
           className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
           恢复默认配置

@@ -1,4 +1,13 @@
-import { Keyword, Hotspot, ApiResponse, HotspotsResponse, SourcePolicy } from '../types/index.js'
+import {
+  Keyword,
+  Hotspot,
+  ApiResponse,
+  HotspotsResponse,
+  SourcePolicy,
+  HotspotImportance,
+  HotspotSortBy,
+  HotspotTimeRange
+} from '../types/index.js'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:5001'
 
@@ -44,7 +53,9 @@ export const hotspotService = {
   getList: async (params: {
     keyword?: string
     source?: string
-    sortBy?: string
+    sortBy?: HotspotSortBy
+    importance?: HotspotImportance
+    timeRange?: HotspotTimeRange
     limit?: number
     offset?: number
     isRead?: boolean
@@ -149,5 +160,20 @@ export const configService = {
     const data: ApiResponse<SourcePolicy> = await res.json()
     if (!data.data) throw new Error('Invalid source policy response')
     return data.data
+  },
+
+  sendTestEmail: async (smtpProfiles?: SourcePolicy['notification']['smtpProfiles']) => {
+    const res = await fetch(`${API_BASE_URL}/api/config/email/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ smtpProfiles })
+    })
+
+    const data: ApiResponse<any> = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '发送测试邮件失败')
+    }
+
+    return data
   }
 }

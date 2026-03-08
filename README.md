@@ -160,7 +160,18 @@ PORT=5001
 DATABASE_URL="file:./app.db"
 OPENROUTER_API_KEY=你的OpenRouter API Key (可选)
 FRONTEND_URL=http://localhost:3000
+
+# SMTP（邮件推送必需，收件人地址单独在设置页填写）
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_USER=your_sender@qq.com
+SMTP_PASS=your_smtp_auth_code
+SMTP_FROM=your_sender@qq.com
 ```
+
+说明：
+- 仅在设置页填写收件邮箱地址不能发信，必须同时配置后端 SMTP 发件账号。
+- `SMTP_PASS` 是邮箱 SMTP 授权码，不是邮箱登录密码。
 
 #### 前端 (`frontend/.env`)
 ```env
@@ -260,6 +271,11 @@ Response: { success: true, data: SourcePolicy }
 # 重置为默认策略
 POST /api/config/source-policy/reset
 Response: { success: true, data: SourcePolicy }
+
+# 发送测试邮件（优先使用请求体邮箱；不传则使用已保存邮箱）
+POST /api/config/email/test
+Body: { recipientEmails?: string[] }
+Response: { success: true, message: string }
 ```
 
 ## 🔄 热点发现流程

@@ -6,12 +6,14 @@ import { notificationStore } from '../services/notificationStore.js'
 import HotspotCard from '../components/HotspotCard.jsx'
 import { TextGenerateEffect } from '../components/ui/text-generate-effect'
 import { MovingBorderButton } from '../components/ui/moving-border'
+import { HotspotImportance, HotspotSortBy, HotspotTimeRange } from '../types/index.js'
 
 export default function HotspotsPage() {
-  const [sortBy, setSortBy] = useState('hotness')
+  const [sortBy, setSortBy] = useState<HotspotSortBy>('hotness')
   const [filterKeyword, setFilterKeyword] = useState('')
-  const [onlySaved, setOnlySaved] = useState(false)
   const [filterSource, setFilterSource] = useState('all')
+  const [importance, setImportance] = useState<HotspotImportance>('all')
+  const [timeRange, setTimeRange] = useState<HotspotTimeRange>('24h')
   const [readFilter, setReadFilter] = useState<'all' | 'read' | 'unread'>('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -21,11 +23,12 @@ export default function HotspotsPage() {
 
   const filter = useMemo(() => ({
     keyword: filterKeyword || undefined,
-    isSaved: onlySaved || undefined,
     source: filterSource === 'all' ? undefined : filterSource,
+    importance,
+    timeRange,
     isRead: readFilter === 'all' ? undefined : readFilter === 'read',
     sortBy
-  }), [filterKeyword, onlySaved, filterSource, readFilter, sortBy])
+  }), [filterKeyword, filterSource, importance, timeRange, readFilter, sortBy])
 
   const { hotspots, total, loading, error, currentPage, totalPages, nextPage, prevPage, refetch } = useHotspots(filter)
 
@@ -169,91 +172,128 @@ export default function HotspotsPage() {
         </MovingBorderButton>
       </div>
 
-      {/* 搜索栏 */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center shadow-soft">
-        <div className="flex flex-1 items-center space-x-2">
-          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="全网搜索关键词..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none transition-all"
-          />
-        </div>
-        <div className="flex items-center space-x-2">
-          <select
-            value={searchMode}
-            onChange={(e) => setSearchMode(e.target.value as 'db' | 'live')}
-            className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none transition-all"
-          >
-            <option value="db">本地搜索</option>
-            <option value="live">全网搜索</option>
-          </select>
-          <button
-            onClick={handleSearch}
-            disabled={isSearching}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-all bg-gradient-accent text-white hover:opacity-90 disabled:opacity-50"
-          >
-            {isSearching ? '搜索中...' : '搜索'}
-          </button>
-          {searchResults && (
-            <button
-              onClick={handleClearSearch}
-              className="px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-            >
-              清除
-            </button>
-          )}
-        </div>
-      </div>
+      {/* 顶部紧凑工具栏 */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-soft">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-2">
+          <div className="flex min-w-0 flex-1 items-center space-x-2">
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="关键词过滤"
+              value={filterKeyword}
+              onChange={(e) => setFilterKeyword(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none transition-all"
+            />
+          </div>
 
-      {/* 过滤和排序栏 */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center shadow-soft">
-        <div className="flex flex-1 items-center space-x-2">
-          <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="按关键词过滤..."
-            value={filterKeyword}
-            onChange={(e) => setFilterKeyword(e.target.value)}
-            className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none transition-all"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={filterSource}
+              onChange={(e) => setFilterSource(e.target.value)}
+              className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none"
+            >
+              <option value="all">全部来源</option>
+              <option value="hackernews">HackerNews</option>
+              <option value="google">Google</option>
+              <option value="bing">Bing</option>
+              <option value="duckduckgo">DuckDuckGo</option>
+              <option value="twitter">Twitter/X</option>
+              <option value="github">GitHub</option>
+              <option value="reddit">Reddit</option>
+              <option value="news">News</option>
+              <option value="rss">RSS</option>
+            </select>
+
+            <select
+              value={importance}
+              onChange={(e) => setImportance(e.target.value as HotspotImportance)}
+              className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none"
+            >
+              <option value="all">重要性: 全部</option>
+              <option value="high">重要性: 高</option>
+              <option value="medium">重要性: 中</option>
+              <option value="low">重要性: 低</option>
+            </select>
+
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value as HotspotTimeRange)}
+              className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none"
+            >
+              <option value="all">时间: 全部</option>
+              <option value="1h">最近 1 小时</option>
+              <option value="6h">最近 6 小时</option>
+              <option value="24h">最近 24 小时</option>
+              <option value="3d">最近 3 天</option>
+              <option value="7d">最近 7 天</option>
+              <option value="30d">最近 30 天</option>
+            </select>
+
+            <select
+              value={readFilter}
+              onChange={(e) => setReadFilter(e.target.value as 'all' | 'read' | 'unread')}
+              className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none"
+            >
+              <option value="all">全部状态</option>
+              <option value="unread">未读</option>
+              <option value="read">已读</option>
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as HotspotSortBy)}
+              className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none"
+            >
+              <option value="hotness">热度综合</option>
+              <option value="published">最新发布</option>
+              <option value="discovered">最新发现</option>
+              <option value="importance">重要程度</option>
+              <option value="relevance">相关性</option>
+            </select>
+          </div>
         </div>
-        <div className="flex items-center space-x-2 flex-wrap">
-          <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none">
-            <option value="all">全部来源</option>
-            <option value="bing">Bing</option>
-            <option value="google">Google</option>
-            <option value="hackernews">HackerNews</option>
-            <option value="duckduckgo">DuckDuckGo</option>
-            <option value="twitter">Twitter/X</option>
-          </select>
-          <select value={readFilter} onChange={(e) => setReadFilter(e.target.value as 'all' | 'read' | 'unread')} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none">
-            <option value="all">全部状态</option>
-            <option value="unread">未读</option>
-            <option value="read">已读</option>
-          </select>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none">
-            <option value="hotness">热度排序</option>
-            <option value="relevance">关联度排序</option>
-            <option value="credibility">可信度排序</option>
-            <option value="time">时间排序</option>
-          </select>
-          <button
-            onClick={() => setOnlySaved(!onlySaved)}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-              onlySaved
-                ? 'bg-accent-50 text-accent-600 border border-accent-200'
-                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 border border-transparent'
-            }`}
-          >
-            已保存
-          </button>
+
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-1 items-center space-x-2">
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="全网搜索关键词..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-accent-400 focus:ring-2 focus:ring-accent-100 focus:outline-none transition-all"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <select
+              value={searchMode}
+              onChange={(e) => setSearchMode(e.target.value as 'db' | 'live')}
+              className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-accent-400 focus:outline-none transition-all"
+            >
+              <option value="db">本地搜索</option>
+              <option value="live">全网搜索</option>
+            </select>
+            <button
+              onClick={handleSearch}
+              disabled={isSearching}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all bg-gradient-accent text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {isSearching ? '搜索中...' : '搜索'}
+            </button>
+            {searchResults && (
+              <button
+                onClick={handleClearSearch}
+                className="px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                清除
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
