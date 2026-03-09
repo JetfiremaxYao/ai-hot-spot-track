@@ -6,11 +6,7 @@
 
 ## 🖼️ 界面预览
 
-为了便于在 GitHub 直接展示产品界面，仓库已增加展示文档：
-
-- [docs/PRODUCT_SHOWCASE.md](docs/PRODUCT_SHOWCASE.md)
-
-当前已收录真实界面截图，位于 `docs/screenshots/` 目录。下面展示项目主界面预览：
+项目界面如下，完整展示页见 [docs/PRODUCT_SHOWCASE.md](docs/PRODUCT_SHOWCASE.md)。
 
 ![AI Hot Spot 热点总览](docs/screenshots/hotspot_mainpage.jpg)
 
@@ -20,7 +16,7 @@
   <img src="docs/screenshots/settings.jpg" alt="采集策略设置" width="32%" />
 </p>
 
-更多页面展示与功能说明见 [docs/PRODUCT_SHOWCASE.md](docs/PRODUCT_SHOWCASE.md)。
+热点发现、搜索检索、关键词管理与采集策略配置构成了项目的完整使用链路。
 
 ### 1. **智能热点发现** 🔍
 - 多源数据采集（HackerNews、GitHub Trending、Reddit、Twitter）
