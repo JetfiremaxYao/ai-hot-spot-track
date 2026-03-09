@@ -4,6 +4,24 @@
 
 ## ✨ 核心功能
 
+## 🖼️ 界面预览
+
+为了便于在 GitHub 直接展示产品界面，仓库已增加展示文档：
+
+- [docs/PRODUCT_SHOWCASE.md](docs/PRODUCT_SHOWCASE.md)
+
+当前已收录真实界面截图，位于 `docs/screenshots/` 目录。下面展示项目主界面预览：
+
+![AI Hot Spot 热点总览](docs/screenshots/hotspot_mainpage.jpg)
+
+<p align="center">
+  <img src="docs/screenshots/search_function.jpg" alt="搜索与检索体验" width="32%" />
+  <img src="docs/screenshots/keywords_afteradd.jpg" alt="关键词管理与新增" width="32%" />
+  <img src="docs/screenshots/settings.jpg" alt="采集策略设置" width="32%" />
+</p>
+
+更多页面展示与功能说明见 [docs/PRODUCT_SHOWCASE.md](docs/PRODUCT_SHOWCASE.md)。
+
 ### 1. **智能热点发现** 🔍
 - 多源数据采集（HackerNews、GitHub Trending、Reddit、Twitter）
 - 每 30 分钟自动爬取和分析新热点
